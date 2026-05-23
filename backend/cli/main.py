@@ -2,7 +2,7 @@
 
 import sys
 
-from stock_info import print_stock_summary
+from backend.core.stock_info import print_stock_summary
 
 
 def main() -> None:

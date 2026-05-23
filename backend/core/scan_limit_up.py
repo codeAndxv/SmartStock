@@ -7,7 +7,7 @@ from typing import Generator, List, Tuple
 import akshare as ak
 import pandas as pd
 
-from stock.stock_info import _to_sina_symbol
+from .stock_info import _to_sina_symbol
 
 
 @dataclass

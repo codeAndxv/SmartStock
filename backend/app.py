@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from stock.scan_limit_up import scan_and_predict, scan_and_predict_with_progress
+from backend.core.scan_limit_up import scan_and_predict, scan_and_predict_with_progress
 
 app = FastAPI(title="SmartStock API")
 

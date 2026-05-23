@@ -1,0 +1,19 @@
+[project]
+name = "smartstock"
+version = "0.1.0"
+description = "A-share limit-up stock scanner with next-day movement prediction"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.34",
+    "akshare>=1.18",
+    "pandas>=2.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+]
+
+[tool.setuptools]
+packages = ["core", "cli"]
