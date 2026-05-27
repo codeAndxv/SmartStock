@@ -1,11 +1,15 @@
 <script setup>
 import { ref } from 'vue'
 import LimitUpTable from './components/LimitUpTable.vue'
+import StockLinks from './components/StockLinks.vue'
+import PortfolioSim from './components/PortfolioSim.vue'
 
 const activeFeature = ref(null)
 
 const features = [
   { key: 'limit-up', label: '涨停分析' },
+  { key: 'stock-links', label: '股票社区' },
+  { key: 'portfolio', label: '组合模拟' },
 ]
 
 function selectFeature(key) {
@@ -32,6 +36,8 @@ function selectFeature(key) {
     </aside>
     <main class="content">
       <LimitUpTable v-if="activeFeature === 'limit-up'" />
+      <StockLinks v-else-if="activeFeature === 'stock-links'" />
+      <PortfolioSim v-else-if="activeFeature === 'portfolio'" />
       <div v-else class="placeholder">
         <p>请从左侧选择功能</p>
       </div>

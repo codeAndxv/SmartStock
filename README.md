@@ -1,5 +1,7 @@
 # SmartStock
 
+[中文版](README_CN.md)
+
 A-share limit-up stock scanner with next-day movement prediction.
 
 ## Product Goals
