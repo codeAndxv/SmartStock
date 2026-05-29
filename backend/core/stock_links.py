@@ -1,19 +1,42 @@
 """Stock community links generator."""
 
+import re
 from dataclasses import dataclass
 from typing import List
 from urllib.parse import quote
 
 import akshare as ak
+import requests
 
 from backend.core.stock_info import _to_market_prefix, _to_sina_symbol, get_stock_profile
+
+_PREFIX_RE = re.compile(r"^(?:sh|sz|bj)?(\d{6})$", re.IGNORECASE)
+
+
+def _strip_prefix(raw: str) -> str | None:
+    """Strip market prefix from code. Returns bare 6-digit code or None."""
+    m = _PREFIX_RE.match(raw.strip())
+    return m.group(1) if m else None
+
+
+def _fetch_name_via_sina(code: str) -> str:
+    """Fetch stock name via Sina real-time quote API (fast, reliable)."""
+    sina = _to_sina_symbol(code)
+    url = f"https://hq.sinajs.cn/list={sina}"
+    r = requests.get(url, headers={"Referer": "https://finance.sina.com.cn"}, timeout=5)
+    r.raise_for_status()
+    _, _, data = r.text.partition("=")
+    fields = data.strip('";\n').split(",")
+    if not fields or not fields[0]:
+        raise ValueError(f"No data for {code}")
+    return fields[0]
 
 
 def _resolve_stock(code_or_name: str) -> tuple[str, str]:
     """Resolve input to (code, name).
 
     Args:
-        code_or_name: Stock code or name
+        code_or_name: Stock code, prefixed code, or name
 
     Returns:
         Tuple of (6-digit code, stock name)
@@ -21,23 +44,32 @@ def _resolve_stock(code_or_name: str) -> tuple[str, str]:
     Raises:
         ValueError: If the input cannot be resolved
     """
-    df = ak.stock_info_a_code_name()
+    # Try stripping prefix first (e.g. "SZ000636" -> "000636")
+    bare = _strip_prefix(code_or_name)
 
-    if code_or_name.isdigit() and len(code_or_name) == 6:
-        match = df[df["code"] == code_or_name]
-        if match.empty:
+    if bare:
+        # Input is a code — get name from Sina (fast, no timeout)
+        try:
+            name = _fetch_name_via_sina(bare)
+            return bare, name
+        except Exception:
             raise ValueError(f"Stock not found: {code_or_name}")
-        return code_or_name, str(match.iloc[0]["name"])
 
-    match = df[df["name"] == code_or_name]
-    if match.empty:
-        match = df[df["name"].str.contains(code_or_name, na=False)]
-    if match.empty:
-        raise ValueError(f"Stock not found: {code_or_name}")
+    # Input is a name — resolve to code via AKShare
+    for _ in range(3):
+        try:
+            df = ak.stock_info_a_code_name()
+            match = df[df["name"] == code_or_name]
+            if match.empty:
+                match = df[df["name"].str.contains(code_or_name, na=False)]
+            if not match.empty:
+                code = str(match.iloc[0]["code"]).zfill(6)
+                name = str(match.iloc[0]["name"])
+                return code, name
+        except Exception:
+            continue
 
-    code = str(match.iloc[0]["code"]).zfill(6)
-    name = str(match.iloc[0]["name"])
-    return code, name
+    raise ValueError(f"Stock not found: {code_or_name}")
 
 
 @dataclass

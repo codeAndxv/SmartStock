@@ -211,3 +211,67 @@ def get_trades(portfolio_id: int) -> List[dict]:
             (portfolio_id,),
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def get_pnl_history(portfolio_id: int) -> List[dict]:
+    """Reconstruct P&L after each trade for charting.
+
+    Returns list of {time, trade_type, stock_name, realized_pnl, total_pnl, pnl_pct}
+    ordered chronologically.
+    """
+    with _conn() as c:
+        portfolio = c.execute("SELECT * FROM portfolios WHERE id = ?", (portfolio_id,)).fetchone()
+        if not portfolio:
+            raise ValueError(f"Portfolio not found: {portfolio_id}")
+
+        trades = c.execute(
+            "SELECT * FROM trades WHERE portfolio_id = ? ORDER BY created_at ASC, id ASC",
+            (portfolio_id,),
+        ).fetchall()
+
+    initial_cash = portfolio["initial_cash"]
+    # holdings: {stock_code: {qty, avg_cost, name}}
+    holdings: dict = {}
+    cumulative_realized = 0.0
+    history: List[dict] = []
+
+    for t in trades:
+        code = t["stock_code"]
+        price = t["price"]
+        qty = t["quantity"]
+        amount = t["amount"]
+
+        if t["trade_type"] == "buy":
+            if code in holdings:
+                h = holdings[code]
+                new_qty = h["qty"] + qty
+                new_avg = (h["avg_cost"] * h["qty"] + price * qty) / new_qty
+                h["qty"] = new_qty
+                h["avg_cost"] = new_avg
+            else:
+                holdings[code] = {"qty": qty, "avg_cost": price, "name": t["stock_name"]}
+        elif t["trade_type"] == "sell":
+            if code in holdings:
+                h = holdings[code]
+                realized = (price - h["avg_cost"]) * qty
+                cumulative_realized += realized
+                h["qty"] -= qty
+                if h["qty"] <= 0:
+                    del holdings[code]
+
+        # total cost of current holdings
+        held_cost = sum(h["avg_cost"] * h["qty"] for h in holdings.values())
+        total_pnl = cumulative_realized + (0.0)  # realized only; no live market data here
+        pnl_pct = (cumulative_realized / initial_cash * 100) if initial_cash > 0 else 0.0
+
+        history.append({
+            "time": t["created_at"],
+            "trade_type": t["trade_type"],
+            "stock_name": t["stock_name"],
+            "price": price,
+            "quantity": qty,
+            "realized_pnl": round(cumulative_realized, 2),
+            "pnl_pct": round(pnl_pct, 2),
+        })
+
+    return history

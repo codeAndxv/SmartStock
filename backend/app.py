@@ -10,11 +10,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from backend.core.portfolio import get_portfolio_summary, get_realtime_price
+from backend.core.portfolio import get_portfolio_summary, get_realtime_price, normalize_code
 from backend.core.portfolio_db import (
     create_portfolio,
     delete_portfolio,
     get_portfolio,
+    get_pnl_history,
     get_trades,
     init_db,
     list_portfolios,
@@ -180,8 +181,9 @@ def api_portfolio_summary(portfolio_id: int):
 def api_create_trade(portfolio_id: int, body: TradeCreate):
     """Execute a buy or sell trade."""
     try:
+        code = normalize_code(body.stock_code)
         trade = record_trade(
-            portfolio_id, body.stock_code, body.stock_name,
+            portfolio_id, code, body.stock_name,
             body.trade_type, body.price, body.quantity,
         )
     except ValueError as e:
@@ -193,6 +195,15 @@ def api_create_trade(portfolio_id: int, body: TradeCreate):
 def api_list_trades(portfolio_id: int):
     """List trade history for a portfolio."""
     return get_trades(portfolio_id)
+
+
+@app.get("/api/portfolios/{portfolio_id}/pnl-history")
+def api_pnl_history(portfolio_id: int):
+    """Get P&L history after each trade for charting."""
+    try:
+        return get_pnl_history(portfolio_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @app.get("/api/stock-price")
